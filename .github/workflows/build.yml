@@ -14,10 +14,27 @@ jobs:
       matrix:
         platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
+    services:
+      postgres:
+        image: postgres:14.5
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: reservation
+        ports:
+          - 5432:5432
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
       - name: Install Rust
         run: rustup toolchain install stable --component llvm-tools-preview
       - name: Install cargo-llvm-cov
@@ -31,5 +48,5 @@ jobs:
         run: cargo check --all
       - name: Lint rust sources
         run: cargo clippy --all-targets --all-features --tests --benches -- -D warnings
-      - name: Execute rust test
+      - name: Execute rust tests
         run: cargo nextest run --all-features
