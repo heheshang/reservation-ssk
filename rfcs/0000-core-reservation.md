@@ -1,4 +1,4 @@
-# Core reservation
+# Core reservation service
 
 - Feature Name: core-reservation
 - Start Date: 2022-11-21 11:08:19
@@ -10,9 +10,90 @@ We leverage prostgres EXCLUDE constraint to ensure that only one reservation can
 
 ## Motivation
 
-Why are we doing this? What use cases does it support? What is the expected outcome?
+We need a common solution for various reservation requirements : 1) calendar booking, 2) hotel/room booking, 3) meeting room booking, 4) parking lot reservation, 5) resource reservation, 6) etc. Repeatedly building features for these requirements is a waste of time and resources. We should have a common solution that can be used for all these requirements.
 
 ## Guide-level explanation
+
+### Service interface
+
+Basic architecture of the service is as follows:
+
+![basic arch](images/arch1.jpg)
+
+We would use gRpc as a service interface. The service interface would be as follows:
+
+ ```proto
+syntax = "proto3";
+
+enum ReservationStatus {
+  UNKNOWN = 0;
+  PENDING = 1;
+  CONFIRMED = 2;
+  BLOCKED = 3;
+}
+
+
+message Reservation {
+    string id = 1;
+    string user_id = 2;
+    ReservationStatus status = 3;
+
+    // The resource that is being reserved
+    string resource_id = 4;
+    google.protobuf.Timestamp start = 5;
+    google.protobuf.Timestamp end = 6;
+    // extra fields
+    string note = 7;
+}
+
+message ReserveRequest {
+    Reservation reservation = 1;
+}
+message ReserveResponse {
+    Reservation reservation = 1;
+}
+message UpdateRequest {
+    string note =2;
+}
+message UpdateResponse {
+    Reservation reservation = 1;
+}
+message ConfirmRequest {
+    string id = 1;
+}
+message ConfirmResponse {
+    Reservation reservation = 1;
+}
+message CancelRequest {
+    string id = 1;
+}
+message CancelResponse {
+    Reservation reservation = 1;
+}
+message GetRequest {
+    string id = 1;
+}
+message GetResponse {
+    Reservation reservation = 1;
+}
+message QueryRequest {
+    string resource_id = 1;
+    string user_id = 2;
+    // use status to filter result. If UNKNOWN, return all reservations
+    ReservationStatus status = 3;
+    google.protobuf.Timestamp start = 4;
+    google.protobuf.Timestamp end = 5;
+}
+service ReservationService {
+    rpc reserve(ReserveRequest) returns (ReserveResponse);
+    rpc confirm(ConfirmRequest) returns (ConfirmResponse);
+    rpc update(UpdateRequest) returns ( UpdateResponse);
+    rpc cancel(CancelRequest) returns (CancelResponse);
+    rpc get(GetRequest) returns (GetResponse);
+    rpc query(QueryRequest) returns (stream Reservation);
+}
+
+ ```
 
 Explain the proposal as if it was already included in the language and you were teaching it to another Rust programmer. That generally means:
 
