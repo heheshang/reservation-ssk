@@ -95,6 +95,26 @@ service ReservationService {
 
  ```
 
+### database schema
+
+We would use postgres as the database. The schema would be as follows:
+
+ ```sql
+create SCHEMA rsvp;
+create type revp.reservation_status as enum ('UNKNOWN', 'PENDING', 'CONFIRMED', 'BLOCKED');
+
+CREATE TABLE rsvp.reservations (
+    id uuid NOT NULL DEFAULT uuid_generate_v4(),
+    user_id varchar(64) NOT NULL,
+    status reservation_status NOT NULL,
+    resource_id varchar(64) NOT NULL,
+    start timestamp NOT NULL,
+    end timestamp NOT NULL,
+    note text,
+    CONSTRAINT reservation_resource_id_start_end_excl
+        EXCLUDE USING gist (resource_id WITH =, start WITH <@, end WITH @>)
+```
+
 Explain the proposal as if it was already included in the language and you were teaching it to another Rust programmer. That generally means:
 
 - Introducing new named concepts.
