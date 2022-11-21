@@ -1,12 +1,12 @@
-# Feature
+# Core reservation
 
-- Feature Name: (fill me in with a unique ident, `my_awesome_feature`)
-- Start Date: (fill me in with today's date, YYYY-MM-DD)
-- specification PR: (leave this empty)
+- Feature Name: core-reservation
+- Start Date: 2022-11-21 11:08:19
 
 ## Summary
 
-One paragraph explanation of the feature.
+A core reservation service that solves the problem of reserving a resource for a period of time.
+We leverage prostgres EXCLUDE constraint to ensure that only one reservation can be made for a given resource at a given time.
 
 ## Motivation
 
