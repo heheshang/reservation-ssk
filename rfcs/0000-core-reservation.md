@@ -115,6 +115,7 @@ We would use postgres as the database. The schema would be as follows:
 
 [the postgres document link](https://www.postgresql.org/docs/15/rangetypes.html)
 [gist index link](https://www.postgresql.org/docs/15/indexes-types.html)
+[trigger link](https://www.postgresql.org/docs/15/plpgsql-trigger.html)
 
 ```sql
 create schema rsvp;
@@ -129,7 +130,6 @@ CREATE TABLE rsvp.reservations (
 
     note text,
     CONSTRAINT reservations_pkey PRIMARY KEY (id),
-    CONSTRAINT reservation_conflict  EXCLUDE USING gist (resource_id WITH =, timespan WITH &&)
 );
 
 CREATE INDEX reservation_resource_id_idx ON rsvp.reservations (resource_id);
@@ -188,25 +188,26 @@ CREATE TRIGGER reservation_trigger
 
 ```
 
-Explain the proposal as if it was already included in the language and you were teaching it to another Rust programmer. That generally means:
+Here we use Exclusion Constraint to provided by postgres to ensure that on overlapping
+reservation cannot be created for a given resource at a given time range.
 
-- Introducing new named concepts.
-- Explaining the feature largely in terms of examples.
-- Explaining how Rust programmers should *think* about the feature, and how it should impact the way they use Rust. It should explain the impact as concretely as possible.
-- If applicable, provide sample error messages, deprecation warnings, or migration guidance.
-- If applicable, describe the differences between teaching this to existing Rust programmers and new Rust programmers.
+```sql
+CONSTRAINT reservation_conflict  EXCLUDE USING gist (resource_id WITH =, timespan WITH &&)
 
-For implementation-oriented RFCs (e.g. for compiler internals), this section should focus on how compiler contributors should think about the change, and give examples of its concrete impact. For policy RFCs, this section should provide an example-driven introduction to the policy, and explain its impact in concrete terms.
+```
+
+![overlapping](images/overlapping.jpg)
+
+We also use a trigger to notify a channel  when a reservation is created, updated or deleted.
+To make sure even we missed certain messages from the channel when DB connection is down for some reason,we use a queue to store the reservation changes. Thus when we receive a notification , we can query the queue to get all the changes happened since the last time we checked.and once we finished processing the changes, we can delete them from the queue.
+
+### Core flow
+
+![core flow](images/arch2.jpg)
 
 ## Reference-level explanation
 
-This is the technical portion of the RFC. Explain the design in sufficient detail that:
-
-- Its interaction with other features is clear.
-- It is reasonably clear how the feature would be implemented.
-- Corner cases are dissected by example.
-
-The section should return to the examples given in the previous section, and explain more fully how the detailed proposal makes those examples work.
+TBD
 
 ## Drawbacks
 
@@ -236,9 +237,11 @@ Please also take into consideration that rust sometimes intentionally diverges f
 
 ## Unresolved questions
 
-- What parts of the design do you expect to resolve through the RFC process before this gets merged?
-- What parts of the design do you expect to resolve through the implementation of this feature before stabilization?
-- What related issues do you consider out of scope for this RFC that could be addressed in the future independently of the solution that comes out of this RFC?
+- how to handle repeated reservation requests? - is this a business logic which shouldn't be put into this layer?(non-goal: we cosider this as a business logic and should be handled by caller)
+
+- if load is high, we may need to use a external queue to store the reservation changes. Thus when we receive a notification , we can query the queue to get all the changes happened since the last time we checked.and once we finished processing the changes, we can delete them from the queue.
+- we haven't considered tracking/observability/deployment yet.
+- query performance might be an issue - need to revisit the query index and also consider using cache.
 
 ## Future possibilities
 
