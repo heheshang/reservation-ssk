@@ -31,7 +31,12 @@ enum ReservationStatus {
   CONFIRMED = 2;
   BLOCKED = 3;
 }
-
+enum ReservationUpdateType {
+  UNKNOWN = 0;
+  CREATE = 1;
+  UPDATE = 2;
+  DELETE = 3;
+}
 
 message Reservation {
     string id = 1;
@@ -84,6 +89,13 @@ message QueryRequest {
     google.protobuf.Timestamp start = 4;
     google.protobuf.Timestamp end = 5;
 }
+message ListenRequest {
+
+}
+
+message ListenResponse {
+    Reservation reservation = 1;
+}
 service ReservationService {
     rpc reserve(ReserveRequest) returns (ReserveResponse);
     rpc confirm(ConfirmRequest) returns (ConfirmResponse);
@@ -91,6 +103,8 @@ service ReservationService {
     rpc cancel(CancelRequest) returns (CancelResponse);
     rpc get(GetRequest) returns (GetResponse);
     rpc query(QueryRequest) returns (stream Reservation);
+    // another system could monitor newly added/updated/cancelled/confirmed reservations
+    rpc listen(ListenRequest) returns (stream ListenResponse);
 }
 
  ```
@@ -99,20 +113,79 @@ service ReservationService {
 
 We would use postgres as the database. The schema would be as follows:
 
- ```sql
-create SCHEMA rsvp;
-create type revp.reservation_status as enum ('UNKNOWN', 'PENDING', 'CONFIRMED', 'BLOCKED');
+[the postgres document link](https://www.postgresql.org/docs/15/rangetypes.html)
+[gist index link](https://www.postgresql.org/docs/15/indexes-types.html)
 
+```sql
+create schema rsvp;
+create type rsvp.reservation_status as enum ('unknown', 'pending', 'confirmed', 'blocked');
+create type rsvp.reservation_update_type as enum ('unknown', 'create', 'update', 'delete');
 CREATE TABLE rsvp.reservations (
     id uuid NOT NULL DEFAULT uuid_generate_v4(),
     user_id varchar(64) NOT NULL,
-    status reservation_status NOT NULL,
+    status revp.reservation_status NOT NULL  DEFAULT 'pending',
     resource_id varchar(64) NOT NULL,
-    start timestamp NOT NULL,
-    end timestamp NOT NULL,
+    timespan tstzrange NOT NULL,
+
     note text,
-    CONSTRAINT reservation_resource_id_start_end_excl
-        EXCLUDE USING gist (resource_id WITH =, start WITH <@, end WITH @>)
+    CONSTRAINT reservations_pkey PRIMARY KEY (id),
+    CONSTRAINT reservation_conflict  EXCLUDE USING gist (resource_id WITH =, timespan WITH &&)
+);
+
+CREATE INDEX reservation_resource_id_idx ON rsvp.reservations (resource_id);
+CREATE INDEX reservation_user_id_idx ON rsvp.reservations (user_id);
+-- if user_id is not provided, we can use this index to query all reservations for a given resource in a given during time range
+-- if resource_id is not provided, we can use this index to query all reservations for a given user in a given during time range
+-- if both resource_id and user_id are provided, we can use this index to query all reservations for a given resource and user in a given during time range
+-- if neither resource_id nor user_id are provided, we can use this index to query all reservations in a given during time range
+CREATE OR REPLACE FUNCTION rsvp.query(uid text, rid text,during: tstzrange ) RETURNS TABLE
+rsvp.reservations AS $$ $$ LANGUAGE plpgsql;
+
+-- reservation change queue
+CREATE TABLE rsvp.reservation_changes (
+    id SERIAL not null,
+    reservation_id uuid NOT NULL,
+    op rsvp.reservation_update_type NOT NULL ,
+    CONSTRAINT reservation_changes_pkey PRIMARY KEY (id),
+);
+
+-- trigger for add/update/delete a reservation
+CREATE OR REPLACE FUNCTION rsvp.reservation_trigger() RETURNS trigger AS $$
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        -- update reservation_changes table
+        INSERT INTO rsvp.reservation_changes (reservation_id, op) VALUES (NEW.id, 'create');
+        -- check if the reservation is valid
+        -- check if the reservation is conflicting with other reservations
+        -- if not, insert the reservation
+        -- if yes, return error
+    ELSIF (TG_OP = 'UPDATE') THEN
+        -- if status is changed, update reservation_changes table
+        IF (OLD.status != NEW.status) THEN
+            INSERT INTO rsvp.reservation_changes (reservation_id, op) VALUES (NEW.id, 'update');
+        END IF;
+
+        -- check if the reservation is valid
+        -- check if the reservation is conflicting with other reservations
+        -- if not, update the reservation
+        -- if yes, return error
+    ELSIF (TG_OP = 'DELETE') THEN
+        -- update reservation_changes table
+        INSERT INTO rsvp.reservation_changes (reservation_id, op) VALUES (OLD.id, 'delete');
+
+        -- delete the reservation
+    END IF;
+    -- notify a channel called reservation_change
+    NOTIFY reservation_change , NEW.id;
+    RETURN null;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER reservation_trigger
+    AFTER INSERT OR UPDATE OR DELETE ON rsvp.reservations
+    FOR EACH ROW EXECUTE PROCEDURE rsvp.reservation_trigger();
+
+
 ```
 
 Explain the proposal as if it was already included in the language and you were teaching it to another Rust programmer. That generally means:

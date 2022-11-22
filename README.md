@@ -1,3 +1,3 @@
 # Reservation
 
-Reservation is a simple tool to manage reservations for a room or a resource.
+this system is based on the following tyrchen's  reservation project
