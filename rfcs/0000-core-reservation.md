@@ -104,7 +104,7 @@ service ReservationService {
     rpc get(GetRequest) returns (GetResponse);
     rpc query(QueryRequest) returns (stream Reservation);
     // another system could monitor newly added/updated/cancelled/confirmed reservations
-    rpc listen(ListenRequest) returns (stream ListenResponse);
+    rpc listen(ListenRequest) returns (ListenResponse);
 }
 
  ```
