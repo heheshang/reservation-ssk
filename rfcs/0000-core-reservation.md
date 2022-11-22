@@ -122,9 +122,9 @@ create schema rsvp;
 create type rsvp.reservation_status as enum ('unknown', 'pending', 'confirmed', 'blocked');
 create type rsvp.reservation_update_type as enum ('unknown', 'create', 'update', 'delete');
 CREATE TABLE rsvp.reservations (
-    id uuid NOT NULL DEFAULT uuid_generate_v4(),
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
     user_id varchar(64) NOT NULL,
-    status revp.reservation_status NOT NULL  DEFAULT 'pending',
+    status rsvp.reservation_status NOT NULL  DEFAULT 'pending',
     resource_id varchar(64) NOT NULL,
     timespan tstzrange NOT NULL,
 
