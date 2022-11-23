@@ -16,6 +16,9 @@ enum ReservationUpdateType {
     RESERVATION_UPDATE_TYPE_UPDATE = 2;
     RESERVATION_UPDATE_TYPE_DELETE = 3;
 }
+
+
+
 // core reservation object,Contains the reservation information for a reservation
 // if ListReservationRequest, only id will be populated
 message Reservation {
@@ -69,8 +72,8 @@ message GetRequest {
 message GetResponse {
     Reservation reservation = 1;
 }
-// To query reservations, send a QueryRequest
-message QueryRequest {
+// query reservation by user_id, resource_id, start time, end time and status
+message ReservationQuery{
     // resource_id for the reservation query， if empty, query all resources
     string resource_id = 1;
     // user_id for the reservation query， if empty, query all users
@@ -81,6 +84,12 @@ message QueryRequest {
     google.protobuf.Timestamp start = 4;
     // end time of the reservation query , if 0, use Infinity for end time
     google.protobuf.Timestamp end = 5;
+}
+
+
+// To query reservations, send a QueryRequest
+message QueryRequest {
+    ReservationQuery query = 1;
 }
 // Client can listen to reservation updates by sending a ListRequest
 message ListenRequest {
