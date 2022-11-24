@@ -8,7 +8,8 @@ CREATE TABLE rsvp.reservations (
     resource_id varchar(64) NOT NULL,
     timespan tstzrange NOT NULL,
     note text,
-    CONSTRAINT reservations_pkey PRIMARY KEY (id)
+    CONSTRAINT reservations_pkey PRIMARY KEY (id),
+    CONSTRAINT reservations_conflict EXCLUDE USING gist (resource_id WITH =, timespan WITH &&)
 );
 
 CREATE INDEX reservation_resource_id_idx ON rsvp.reservations (resource_id);

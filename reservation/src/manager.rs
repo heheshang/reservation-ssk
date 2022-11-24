@@ -69,7 +69,22 @@ impl ReservationManager {
 mod tests {
 
     use super::*;
-
+    // #[tokio::test]
+    // async fn reserve_should_work() {
+    //     let pool = PgPool::connect("postgres://postgres:123456@localhost:5432/reservation")
+    //         .await
+    //         .unwrap();
+    //     let manager = ReservationManager::new(pool);
+    //     let rsvp = abi::Reservation::new_pending(
+    //         "user_id",
+    //         "resource_id",
+    //         "2021-12-25T00:00:00Z".parse().unwrap(),
+    //         "2021-12-28T00:00:00Z".parse().unwrap(),
+    //         "note",
+    //     );
+    //     let r = manager.reserve(rsvp).await;
+    //     assert!(r.is_ok());
+    // }
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
     async fn reserve_should_work_for_valid_window() {
         let manager = ReservationManager::new(migrated_pool.clone());
@@ -91,25 +106,26 @@ mod tests {
         let manager = ReservationManager::new(migrated_pool.clone());
         let rsvp1 = abi::Reservation::new_pending(
             "user_id1",
-            "resource_id1",
+            "resource1",
             "2021-12-25T00:00:00Z".parse().unwrap(),
             "2021-12-28T00:00:00Z".parse().unwrap(),
             "hello",
         );
-        let _rsvp2 = abi::Reservation::new_pending(
+        let rsvp2 = abi::Reservation::new_pending(
             "user_id2",
-            "resource_id1",
-            "2021-12-26T00:00:00Z".parse().unwrap(),
-            "2021-12-27T00:00:00Z".parse().unwrap(),
+            "resource1",
+            "2021-12-25T00:00:00Z".parse().unwrap(),
+            "2021-12-28T00:00:00Z".parse().unwrap(),
             "hello",
         );
 
-        let _r1 = manager.reserve(rsvp1).await.unwrap();
-        // let err = manager.reserve(rsvp2).await.unwrap_err();
-        // println!("{:?}", err);
-        // if let abi::Error::ConflictReservation() = err {
-        // } else {
-        //     panic!("expect conflict error");
-        // }
+        let r1 = manager.reserve(rsvp1).await.unwrap();
+        println!("r1: {:?}", r1);
+        let err = manager.reserve(rsvp2).await.unwrap_err();
+        println!("r2 {:?}", err);
+        if let abi::Error::ConflictReservation(_info) = err {
+        } else {
+            panic!("expect conflict error");
+        }
     }
 }
