@@ -125,7 +125,7 @@ pub enum ReservationStatus {
     Unknown = 0,
     Pending = 1,
     Confirmed = 2,
-    Locked = 3,
+    Blocked = 3,
 }
 impl ReservationStatus {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -137,7 +137,7 @@ impl ReservationStatus {
             ReservationStatus::Unknown => "RESERVATION_STATUS_UNKNOWN",
             ReservationStatus::Pending => "RESERVATION_STATUS_PENDING",
             ReservationStatus::Confirmed => "RESERVATION_STATUS_CONFIRMED",
-            ReservationStatus::Locked => "RESERVATION_STATUS_LOCKED",
+            ReservationStatus::Blocked => "RESERVATION_STATUS_BLOCKED",
         }
     }
 }
