@@ -83,6 +83,8 @@ impl ReservationManager {
 #[cfg(test)]
 mod tests {
 
+    use abi::{ReservationConflict, ReservationConflictInfo, ReservationWindow};
+
     use super::*;
     // #[tokio::test]
     // async fn reserve_should_work() {
@@ -137,14 +139,21 @@ mod tests {
         let r1 = manager.reserve(rsvp1).await.unwrap();
         println!("r1: {:?}", r1);
         let err = manager.reserve(rsvp2).await.unwrap_err();
-        println!("r2 {:?}", err);
-        if let abi::Error::ConflictReservation(abi::ReservationConflictInfo::Parsed(info)) = err {
-            assert_eq!(info.old.rid, "resource1");
-            assert_eq!(info.old.start.to_rfc3339(), "2021-12-25T00:00:00+00:00");
-            assert_eq!(info.old.end.to_rfc3339(), "2021-12-28T00:00:00+00:00");
-        } else {
-            panic!("should be conflict reservation error");
-        }
+        println!("err {:?}", err);
+        let info = ReservationConflictInfo::Parsed(ReservationConflict {
+            new: ReservationWindow {
+                rid: "resource1".to_string(),
+                start: "2021-12-25T00:00:00Z".parse().unwrap(),
+                end: "2021-12-28T00:00:00Z".parse().unwrap(),
+            },
+            old: ReservationWindow {
+                rid: "resource1".to_string(),
+                start: "2021-12-25T00:00:00Z".parse().unwrap(),
+                end: "2021-12-28T00:00:00Z".parse().unwrap(),
+            },
+        });
+        println!("info {:?}", info);
+        assert_eq!(err, abi::Error::ReservationConflict(info));
     }
 
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
