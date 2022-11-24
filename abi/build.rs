@@ -8,7 +8,7 @@ fn main() {
         .unwrap();
     // fs::remove_file("path/to/file").unwrap();
 
-    Command::new("cargo").args(&["fmt"]).output().unwrap();
+    Command::new("cargo").args(["fmt"]).output().unwrap();
 
     println!("cargo:rerun-if-changed=protos/reservation.proto");
 
