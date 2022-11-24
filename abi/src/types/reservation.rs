@@ -1,11 +1,16 @@
-use std::ops::Range;
+use std::ops::{Bound, Range};
 
 use crate::{
     error::Error,
     utils::{convert_to_timestamp, convert_to_utc_time},
-    Reservation, ReservationStatus,
+    Reservation, ReservationStatus, RsvpStatus,
 };
 use chrono::{DateTime, FixedOffset, Utc};
+use sqlx::{
+    postgres::{types::PgRange, PgRow},
+    types::Uuid,
+    FromRow, Row,
+};
 
 impl Reservation {
     pub fn new_pending(
@@ -49,5 +54,50 @@ impl Reservation {
         let start = convert_to_utc_time(self.start.as_ref().unwrap().clone());
         let end = convert_to_utc_time(self.end.as_ref().unwrap().clone());
         Range { start, end }
+    }
+}
+
+impl FromRow<'_, PgRow> for Reservation {
+    fn from_row(row: &PgRow) -> Result<Self, sqlx::Error> {
+        let id: Uuid = row.get("id");
+        let range: PgRange<DateTime<Utc>> = row.get("timespan");
+        let range: NaiveRange<DateTime<Utc>> = range.into();
+
+        assert!(range.start.is_some());
+        assert!(range.end.is_some());
+
+        let start = range.start.unwrap();
+        let end = range.end.unwrap();
+
+        let status: RsvpStatus = row.get("status");
+
+        Ok(Self {
+            id: id.to_string(),
+            resource_id: row.get("resource_id"),
+            user_id: row.get("user_id"),
+            start: Some(convert_to_timestamp(start)),
+            end: Some(convert_to_timestamp(end)),
+            note: row.get("note"),
+            status: ReservationStatus::from(status) as i32,
+        })
+    }
+}
+struct NaiveRange<T> {
+    start: Option<T>,
+    end: Option<T>,
+}
+
+impl<T> From<PgRange<T>> for NaiveRange<T> {
+    fn from(range: PgRange<T>) -> Self {
+        let f = |b: Bound<T>| match b {
+            Bound::Included(v) => Some(v),
+            Bound::Excluded(v) => Some(v),
+            Bound::Unbounded => None,
+        };
+
+        let start = f(range.start);
+        let end = f(range.end);
+
+        Self { start, end }
     }
 }
