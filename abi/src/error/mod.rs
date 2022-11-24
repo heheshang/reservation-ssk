@@ -1,7 +1,7 @@
 use sqlx::postgres::PgDatabaseError;
 use thiserror::Error;
 mod conflict;
-// pub use conflict::{ReservationConflictInfo, ReservationWindow};
+pub use conflict::{ReservationConflictInfo, ReservationWindow};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -12,8 +12,9 @@ pub enum Error {
 
     #[error("Invalid resource id {0}")]
     InvalidResourceId(String),
-    #[error("Invalid time {0}")]
-    ConflictReservation(String),
+
+    #[error("conflict reservation: {0:?}")]
+    ConflictReservation(ReservationConflictInfo),
 
     // #[error("database error: {0}")]
     // DbError(#[from] sqlx::Error),
@@ -30,7 +31,7 @@ impl From<sqlx::Error> for Error {
                 let err: &PgDatabaseError = e.downcast_ref();
                 match (err.code(), err.schema(), err.table()) {
                     ("23P01", Some("rsvp"), Some("reservations")) => {
-                        Error::ConflictReservation(err.detail().unwrap().to_string())
+                        Error::ConflictReservation(err.detail().unwrap().parse().unwrap())
                     }
 
                     _ => Error::DbError(sqlx::Error::Database(e)),

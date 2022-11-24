@@ -123,9 +123,12 @@ mod tests {
         println!("r1: {:?}", r1);
         let err = manager.reserve(rsvp2).await.unwrap_err();
         println!("r2 {:?}", err);
-        if let abi::Error::ConflictReservation(_info) = err {
+        if let abi::Error::ConflictReservation(abi::ReservationConflictInfo::Parsed(info)) = err {
+            assert_eq!(info.old.rid, "resource1");
+            assert_eq!(info.old.start.to_rfc3339(), "2021-12-25T00:00:00+00:00");
+            assert_eq!(info.old.end.to_rfc3339(), "2021-12-28T00:00:00+00:00");
         } else {
-            panic!("expect conflict error");
+            panic!("should be conflict reservation error");
         }
     }
 }
