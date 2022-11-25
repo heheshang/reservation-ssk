@@ -1,8 +1,7 @@
 use crate::{ReservationId, ReservationManager, Rsvp};
-use abi::convert_to_utc_time;
+use abi::Validator;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use sqlx::{postgres::types::PgRange, types::Uuid, PgPool, Row};
+use sqlx::{types::Uuid, PgPool, Row};
 
 #[async_trait]
 impl Rsvp for ReservationManager {
@@ -12,7 +11,7 @@ impl Rsvp for ReservationManager {
             return Err(abi::Error::InvalidTime);
         }
 
-        let timespan: PgRange<DateTime<Utc>> = rsvp.get_time_span().into();
+        let timespan = rsvp.get_time_span();
 
         let status = abi::ReservationStatus::from_i32(rsvp.status)
             .unwrap_or(abi::ReservationStatus::Pending);
@@ -107,44 +106,49 @@ impl Rsvp for ReservationManager {
         .await?;
         Ok(rsvp)
     }
+
     async fn query(
         &self,
         query: abi::ReservationQuery,
     ) -> Result<Vec<abi::Reservation>, abi::Error> {
-        let mut sql = "SELECT * FROM rsvp.reservations WHERE 1 = 1".to_string();
-        let mut params = Vec::new();
+        query.validate()?;
+        let user_id = string_to_option(&query.user_id);
+        let resource_id = string_to_option(&query.resource_id);
+        let during = query.get_query_timespan();
+        let status = abi::ReservationStatus::from_i32(query.status)
+            .unwrap_or(abi::ReservationStatus::Pending)
+            .to_string();
 
-        if let Some(resource_id) = query.resource_id {
-            sql.push_str(" AND resource_id = $1");
-            params.push(resource_id);
-        }
-        if let Some(user_id) = query.user_id {
-            sql.push_str(" AND user_id = $2");
-            params.push(user_id);
-        }
-        if let Some(status) = query.status {
-            sql.push_str(" AND status = $3::rsvp.reservation_status");
-            params.push(status.to_string());
-        }
-        if let Some(start) = query.start {
-            sql.push_str(" AND timespan @> $4");
-            params.push(convert_to_utc_time(start).to_string());
-        }
-        if let Some(end) = query.end {
-            sql.push_str(" AND timespan @< $5");
-            params.push(convert_to_utc_time(end).to_string());
-        }
-
-        let rsvps: Vec<abi::Reservation> = sqlx::query_as(&sql)
-            .bind(params)
-            .fetch_all(&self.pool)
-            .await?;
-        Ok(rsvps)
+        // println!("during: {:?}", during);
+        // println!("status: {:?}", status);
+        // println!("resource_id: {:?}", query.resource_id);
+        // println!("user_id: {:?}", query.user_id);
+        let resps = sqlx::query_as(
+            r#"SELECT * FROM rsvp.query($1, $2, $3, $4::rsvp.reservation_status, $5, $6, $7)"#,
+        )
+        .bind(user_id)
+        .bind(resource_id)
+        .bind(during)
+        .bind(status)
+        .bind(query.page)
+        .bind(query.desc)
+        .bind(query.page_size)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(resps)
     }
 }
 impl ReservationManager {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+}
+
+fn string_to_option(s: &str) -> Option<String> {
+    if s.is_empty() {
+        None
+    } else {
+        Some(s.into())
     }
 }
 
@@ -236,17 +240,26 @@ mod tests {
         assert_eq!(r.id, rsvp.id);
     }
 
-    // private none test functions
-    async fn make_ssk_reservation(pool: PgPool) -> (Reservation, ReservationManager) {
-        make_reservation(
-            pool,
-            "sskid",
-            "ocean-view-room-713",
-            "2022-12-25T15:00:00-0700",
-            "2022-12-28T12:00:00-0700",
-            "I'll arrive at 3pm. Please help to upgrade to execuitive room if possible.",
-        )
-        .await
+    // query function test
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn query_reservations_should_work() {
+        let (rsvp, manager) = make_alice_reservation(migrated_pool.clone()).await;
+
+        let query = abi::ReservationQuery {
+            user_id: "aliceid".to_string(),
+            status: abi::ReservationStatus::Pending as i32,
+            start: Some("2022-12-25T15:00:00-0700".parse().unwrap()),
+            end: Some("2023-02-25T12:00:00-0700".parse().unwrap()),
+            page_size: 10,
+            page: 1,
+            desc: false,
+            ..Default::default()
+        };
+
+        let rsvps = manager.query(query).await.unwrap();
+        println!("rsvps: {:?}", rsvps);
+        assert_eq!(rsvps.len(), 1);
+        assert_eq!(rsvp, rsvps[0]);
     }
 
     async fn make_alice_reservation(pool: PgPool) -> (Reservation, ReservationManager) {
@@ -257,6 +270,18 @@ mod tests {
             "2023-01-25T15:00:00-0700",
             "2023-02-25T12:00:00-0700",
             "I need to book this for xyz project for a month.",
+        )
+        .await
+    }
+    // private none test functions
+    async fn make_ssk_reservation(pool: PgPool) -> (Reservation, ReservationManager) {
+        make_reservation(
+            pool,
+            "sskid",
+            "ocean-view-room-713",
+            "2022-12-25T15:00:00-0700",
+            "2022-12-28T12:00:00-0700",
+            "I'll arrive at 3pm. Please help to upgrade to execuitive room if possible.",
         )
         .await
     }

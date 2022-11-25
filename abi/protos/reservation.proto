@@ -75,15 +75,22 @@ message GetResponse {
 // query reservation by user_id, resource_id, start time, end time and status
 message ReservationQuery{
     // resource_id for the reservation query， if empty, query all resources
-    optional string resource_id = 1 ;
+     string resource_id = 1 ;
     // user_id for the reservation query， if empty, query all users
-    optional string user_id = 2;
+     string user_id = 2;
     // use status to filter result. If UNKNOWN, return all reservations
-    optional ReservationStatus status = 3;
+     ReservationStatus status = 3;
     // start time of the reservation query,if 0, use Infinity for start time
-    optional google.protobuf.Timestamp start = 4;
+     google.protobuf.Timestamp start = 4;
     // end time of the reservation query , if 0, use Infinity for end time
-    optional google.protobuf.Timestamp end = 5;
+     google.protobuf.Timestamp end = 5;
+    // current page number for pagination
+     int32 page = 6;
+    // page size for the reservation query
+     int32 page_size = 7;
+    // sort direction for the reservation query
+     bool desc = 8;
+
 }
 
 
