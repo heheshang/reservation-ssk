@@ -82,14 +82,14 @@ pub struct GetResponse {
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ReservationQuery {
     /// resource_id for the reservation query， if empty, query all resources
-    #[prost(string, tag = "1")]
-    pub resource_id: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "1")]
+    pub resource_id: ::core::option::Option<::prost::alloc::string::String>,
     /// user_id for the reservation query， if empty, query all users
-    #[prost(string, tag = "2")]
-    pub user_id: ::prost::alloc::string::String,
+    #[prost(string, optional, tag = "2")]
+    pub user_id: ::core::option::Option<::prost::alloc::string::String>,
     /// use status to filter result. If UNKNOWN, return all reservations
-    #[prost(enumeration = "ReservationStatus", tag = "3")]
-    pub status: i32,
+    #[prost(enumeration = "ReservationStatus", optional, tag = "3")]
+    pub status: ::core::option::Option<i32>,
     /// start time of the reservation query,if 0, use Infinity for start time
     #[prost(message, optional, tag = "4")]
     pub start: ::core::option::Option<::prost_types::Timestamp>,
