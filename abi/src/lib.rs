@@ -9,6 +9,10 @@ pub use pb::*;
 pub use types::*;
 pub use utils::*;
 
+pub type ReservationId = i64;
+pub type InvalidUserId = String;
+pub type InvalidResourceId = String;
+
 pub trait Validator {
     fn validate(&self) -> Result<(), Error>;
 }
@@ -29,5 +33,14 @@ impl From<RsvpStatus> for ReservationStatus {
             RsvpStatus::Confirmed => ReservationStatus::Confirmed,
             RsvpStatus::Unknown => ReservationStatus::Unknown,
         }
+    }
+}
+
+impl Validator for ReservationId {
+    fn validate(&self) -> Result<(), Error> {
+        if *self <= 0 {
+            return Err(Error::InvalidReservationId(*self));
+        }
+        Ok(())
     }
 }

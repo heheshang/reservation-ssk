@@ -15,6 +15,10 @@ sqlx migrate run
 sqlx migrate add reservation_trigger -r
 
  select * from _sqlx_migrations;
+
+
+ pg_dump -s postgres://postgres:123456@localhost:5432/reservation >reservation/fixtures/dump.sql
 ```
 
 [正则表达式](https://regexr.com/)
+[pgclient update](https://blog.csdn.net/worldzhy/article/details/106202523)

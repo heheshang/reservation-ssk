@@ -14,7 +14,7 @@ pub enum Error {
     InvalidResourceId(String),
 
     #[error("Invalid reservation id {0}")]
-    InvalidReservationId(String),
+    InvalidReservationId(i64),
 
     #[error("conflict reservation: {0:?}")]
     ReservationConflict(ReservationConflictInfo),
