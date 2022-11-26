@@ -18,6 +18,7 @@ sqlx = { version = "0.6.2", features = [
 ] }
 thiserror = "1.0.37"
 regex = "1.7.0"
+derive_builder = "0.11.2"
 
 [build-dependencies]
 tonic-build = "0.8.2"
