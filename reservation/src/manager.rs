@@ -118,11 +118,6 @@ impl Rsvp for ReservationManager {
         let status = abi::ReservationStatus::from_i32(query.status)
             .unwrap_or(abi::ReservationStatus::Pending)
             .to_string();
-
-        // println!("during: {:?}", during);
-        // println!("status: {:?}", status);
-        // println!("resource_id: {:?}", query.resource_id);
-        // println!("user_id: {:?}", query.user_id);
         let resps = sqlx::query_as(
             r#"SELECT * FROM rsvp.query($1, $2, $3, $4::rsvp.reservation_status, $5, $6, $7)"#,
         )
@@ -155,7 +150,11 @@ fn string_to_option(s: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
 
-    use abi::{Reservation, ReservationConflict, ReservationConflictInfo, ReservationWindow};
+    use abi::{
+        Reservation, ReservationConflict, ReservationConflictInfo, ReservationQueryBuilder,
+        ReservationWindow,
+    };
+    use prost_types::Timestamp;
 
     use super::*;
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
@@ -241,24 +240,53 @@ mod tests {
     }
 
     // // query function test
-    // #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
-    // async fn query_reservations_should_work() {
-    //     let (rsvp, _manager) = make_alice_reservation(migrated_pool.clone()).await;
-    //     let query = ReservationQueryBuilder::default()
-    //         .user_id("aliceid")
-    //         .resource_id("")
-    //         .status(abi::ReservationStatus::Pending as i32)
-    //         .start("2022-12-25T15:00:00-0700".parse::<Timestamp>().unwrap())
-    //         .end("2023-02-25T12:00:00-0700".parse::<Timestamp>().unwrap())
-    //         .build()
-    //         .unwrap();
-    //     print!("query: {:?}", query);
-    //     println!("r: {:?}", rsvp);
-    //     // let rsvps = manager.query(query).await.unwrap();
-    //     // println!("rsvps: {:?}", rsvps);
-    //     // assert_eq!(rsvps.len(), 1);
-    //     // assert_eq!(rsvp, rsvps[0]);
-    // }
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn query_reservations_should_work() {
+        let (rsvp, manager) = make_alice_reservation(migrated_pool.clone()).await;
+        let query = ReservationQueryBuilder::default()
+            .user_id("aliceid")
+            .status(abi::ReservationStatus::Pending as i32)
+            .start("2022-12-25T15:00:00-0700".parse::<Timestamp>().unwrap())
+            .end("2023-02-25T12:00:00-0700".parse::<Timestamp>().unwrap())
+            .build()
+            .unwrap();
+        let rsvps = manager.query(query).await.unwrap();
+        assert_eq!(rsvps.len(), 1);
+        assert_eq!(rsvp, rsvps[0]);
+
+        let query = ReservationQueryBuilder::default()
+            .user_id("aliceid")
+            .status(abi::ReservationStatus::Confirmed as i32)
+            .start("2022-12-25T15:00:00-0700".parse::<Timestamp>().unwrap())
+            .end("2023-02-21T12:00:00-0700".parse::<Timestamp>().unwrap())
+            .build()
+            .unwrap();
+
+        let rsvps = manager.query(query).await.unwrap();
+        assert_eq!(rsvps.len(), 0);
+
+        manager.change_status(rsvp.id).await.unwrap();
+        let query = ReservationQueryBuilder::default()
+            .user_id("aliceid")
+            .status(abi::ReservationStatus::Confirmed as i32)
+            .start("2022-12-25T15:00:00-0700".parse::<Timestamp>().unwrap())
+            .end("2023-02-25T12:00:00-0700".parse::<Timestamp>().unwrap())
+            .build()
+            .unwrap();
+
+        let rsvps = manager.query(query).await.unwrap();
+        assert_eq!(rsvps.len(), 1);
+
+        // if timespan is not specified, it should return all reservations
+        // let query = ReservationQueryBuilder::default()
+        //     .user_id("aliceid")
+        //     .status(abi::ReservationStatus::Confirmed as i32)
+        //     .build()
+        //     .unwrap();
+        // println!("query: {:?}", query);
+        // let resps = manager.query(query).await.unwrap();
+        // assert_eq!(resps.len(), 0);
+    }
 
     async fn make_alice_reservation(pool: PgPool) -> (Reservation, ReservationManager) {
         make_reservation(

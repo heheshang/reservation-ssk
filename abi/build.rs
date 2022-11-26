@@ -26,15 +26,6 @@ fn main() {
     Command::new("cargo").args(["fmt"]).output().unwrap();
 
     println!("cargo:rerun-if-changed=protos/reservation.proto");
-
-    // tonic_build::configure()
-    //     .out_dir("src/pb")
-    //     .compile(&["protos/reservation.proto"], &["protos"])
-    //     .unwrap();
-
-    // Command::new("cargo").args(&["fmt"]).output().unwrap();
-
-    // println!("cargo:rerun-if-changed=protos/reservation.proto");
 }
 
 trait BuilderExt {
@@ -56,14 +47,17 @@ impl BuilderExt for Builder {
     }
     fn with_builder_into(self, paths: &str, fields: &[&str]) -> Self {
         fields.iter().fold(self, |b, f| {
-            b.field_attribute(&format!("{}.{}", paths, f), "#[builder(setter(into))]")
+            b.field_attribute(
+                &format!("{}.{}", paths, f),
+                "#[builder(setter(into),default)]",
+            )
         })
     }
     fn with_builder_option(self, paths: &str, fields: &[&str]) -> Self {
         fields.iter().fold(self, |b, f| {
             b.field_attribute(
                 &format!("{}.{}", paths, f),
-                "#[builder(setter(into,strip_option))]",
+                "#[builder(setter(into,strip_option),default)]",
             )
         })
     }

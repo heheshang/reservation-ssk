@@ -35,3 +35,54 @@ pub fn get_timespan(start: Option<&Timestamp>, end: Option<&Timestamp>) -> PgRan
         end: Bound::Excluded(end),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use prost_types::Timestamp;
+
+    #[test]
+    fn validate_range_should_work() {
+        let start = Some(&Timestamp {
+            seconds: 1,
+            nanos: 0,
+        });
+        let end = Some(&Timestamp {
+            seconds: 2,
+            nanos: 0,
+        });
+        assert!(validate_range(start, end).is_ok());
+    }
+    #[test]
+    fn validate_range_should_fail() {
+        let start = Some(&Timestamp {
+            seconds: 2,
+            nanos: 0,
+        });
+        let end = Some(&Timestamp {
+            seconds: 1,
+            nanos: 0,
+        });
+        assert!(validate_range(start, end).is_err());
+    }
+    #[test]
+    fn get_timespan_should_work() {
+        let start = Some(&Timestamp {
+            seconds: 1,
+            nanos: 0,
+        });
+        let end = Some(&Timestamp {
+            seconds: 2,
+            nanos: 0,
+        });
+        let timespan = get_timespan(start, end);
+        assert_eq!(
+            timespan.start,
+            Bound::Included(convert_to_utc_time(start.unwrap().clone()))
+        );
+        assert_eq!(
+            timespan.end,
+            Bound::Excluded(convert_to_utc_time(end.unwrap().clone()))
+        );
+    }
+}
