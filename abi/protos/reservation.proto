@@ -74,30 +74,62 @@ message GetResponse {
 }
 // query reservation by user_id, resource_id, start time, end time and status
 message ReservationQuery{
-    // resource_id for the reservation query， if empty, query all resources
-     string resource_id = 1 ;
-    // user_id for the reservation query， if empty, query all users
-     string user_id = 2;
-    // use status to filter result. If UNKNOWN, return all reservations
-     ReservationStatus status = 3;
-    // start time of the reservation query,if 0, use Infinity for start time
-     google.protobuf.Timestamp start = 4;
-    // end time of the reservation query , if 0, use Infinity for end time
-     google.protobuf.Timestamp end = 5;
-    // current page number for pagination
-     int32 page = 6;
-    // page size for the reservation query
-     int32 page_size = 7;
-    // sort direction for the reservation query
-     bool desc = 8;
+// resource_id for the reservation query， if empty, query all resources
+    string resource_id = 1 ;
+// user_id for the reservation query， if empty, query all users
+    string user_id = 2;
+// use status to filter result. If UNKNOWN, return all reservations
+    ReservationStatus status = 3;
+// start time of the reservation query,if 0, use Infinity for start time
+    google.protobuf.Timestamp start = 4;
+// end time of the reservation query , if 0, use Infinity for end time
+    google.protobuf.Timestamp end = 5;
+// current page number for pagination
+    int32 page = 6;
+// page size for the reservation query
+    int32 page_size = 7;
+// sort direction for the reservation query
+    bool desc = 8;
 
+}
+// To query reservations, order by reservation id
+message ReservationFilter{
+    // resource_id for the reservation query， if empty, query all resources
+    string resource_id = 1 ;
+    // user_id for the reservation query， if empty, query all users
+    string user_id = 2;
+    // use status to filter result. If UNKNOWN, return all reservations
+    ReservationStatus status = 3;
+    // previous cursor for the reservation query
+    int64 cursor = 4;
+    // page size for the reservation query
+    int32 page_size = 5;
+    // sort direction for the reservation query
+    bool desc = 6;
+
+
+}
+message QueryRequest {
+    ReservationQuery query = 1;
 }
 
 
 // To query reservations, send a QueryRequest
-message QueryRequest {
-    ReservationQuery query = 1;
+message FilterRequest {
+    ReservationFilter filter = 1;
 }
+
+// filter pager info
+message FilterPager{
+    int64 prev = 1;
+    int64 next = 2;
+    int64 total = 3;
+}
+message FilterResponse {
+    repeated Reservation reservations = 1;
+    FilterPager pager = 2;
+}
+
 // Client can listen to reservation updates by sending a ListRequest
 message ListenRequest {
 
@@ -123,6 +155,9 @@ service ReservationService {
     rpc get(GetRequest) returns (GetResponse);
     // query reservations by resource_id, user_id, status, start time, end time
     rpc query(QueryRequest) returns (stream Reservation);
+    // query reservations ,order by reservation id
+    rpc filter(FilterRequest) returns (FilterResponse);
+
     // another system could monitor newly added/updated/cancelled/confirmed reservations
-    rpc listen(ListenRequest) returns (ListenResponse);
+    rpc listen(ListenRequest) returns (stream Reservation);
 }

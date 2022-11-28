@@ -42,6 +42,12 @@ mod tests {
     use prost_types::Timestamp;
 
     #[test]
+    fn test_i64_default() {
+        let ss: i64 = Default::default();
+        println!("{}", ss);
+        assert_eq!(ss, 0);
+    }
+    #[test]
     fn validate_range_should_work() {
         let start = Some(&Timestamp {
             seconds: 1,

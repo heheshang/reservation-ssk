@@ -1,4 +1,17 @@
 {
     "editor.fontFamily": "JetBrains Mono,Consolas, 'Courier New', monospace",
-    "rust-analyzer.checkOnSave.command": "clippy"
+    "rust-analyzer.checkOnSave.command": "clippy",
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "server": "localhost",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "reservation",
+            "group": "rsvp",
+            "database": "reservation",
+            "username": "postgres",
+            "password": "123456"
+        }
+    ]
 }

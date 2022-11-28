@@ -1,5 +1,5 @@
 use crate::{ReservationManager, Rsvp};
-use abi::{ReservationId, Validator};
+use abi::{FilterPager, ReservationId, Validator};
 use async_trait::async_trait;
 use sqlx::{PgPool, Row};
 
@@ -125,6 +125,59 @@ impl Rsvp for ReservationManager {
         .await?;
         Ok(resps)
     }
+
+    async fn filter(
+        &self,
+        filter: abi::ReservationFilter,
+    ) -> Result<(FilterPager, Vec<abi::Reservation>), abi::Error> {
+        // filter reservations by user_id, resource_id, during, status and order by id
+        let user_id = string_to_option(&filter.user_id);
+        let resource_id = string_to_option(&filter.resource_id);
+        let status = abi::ReservationStatus::from_i32(filter.status)
+            .unwrap_or(abi::ReservationStatus::Pending)
+            .to_string();
+
+        let page_size = if filter.page_size < 10 || filter.page_size > 100 {
+            10
+        } else {
+            filter.page_size
+        };
+
+        let rsvps: Vec<abi::Reservation> = sqlx::query_as(
+            r#"SELECT * FROM rsvp.filter($1, $2, $3::rsvp.reservation_status, $4, $5, $6)"#,
+        )
+        .bind(user_id)
+        .bind(resource_id)
+        .bind(status)
+        .bind(filter.cursor)
+        .bind(filter.desc)
+        .bind(page_size)
+        .fetch_all(&self.pool)
+        .await?;
+        // if the first id is current cursor, then we have prev,we start form 1
+        // if len-start > page_size, then we have next, we end at len-1
+
+        let has_prev = !rsvps.is_empty() && rsvps[0].id == filter.cursor;
+        let start = if has_prev { 1 } else { 0 };
+
+        let has_next = rsvps.len() - start > page_size as usize;
+        let end = if has_next {
+            rsvps.len() - 1
+        } else {
+            rsvps.len()
+        };
+
+        let prev = if has_prev { rsvps[start - 1].id } else { -1 };
+        let next = if has_next { rsvps[end - 1].id } else { -1 };
+
+        let results = rsvps[start..end].to_vec();
+        let pager = FilterPager {
+            prev,
+            next,
+            total: 0,
+        };
+        Ok((pager, results))
+    }
 }
 impl ReservationManager {
     pub fn new(pool: PgPool) -> Self {
@@ -144,8 +197,8 @@ fn string_to_option(s: &str) -> Option<String> {
 mod tests {
 
     use abi::{
-        Reservation, ReservationConflict, ReservationConflictInfo, ReservationQueryBuilder,
-        ReservationWindow,
+        Reservation, ReservationConflict, ReservationConflictInfo, ReservationFilterBuilder,
+        ReservationQueryBuilder, ReservationWindow,
     };
     use prost_types::Timestamp;
 
@@ -271,16 +324,22 @@ mod tests {
 
         let rsvps = manager.query(query).await.unwrap();
         assert_eq!(rsvps.len(), 1);
+    }
 
-        // if timespan is not specified, it should return all reservations
-        // let query = ReservationQueryBuilder::default()
-        //     .user_id("aliceid")
-        //     .status(abi::ReservationStatus::Confirmed as i32)
-        //     .build()
-        //     .unwrap();
-        // println!("query: {:?}", query);
-        // let resps = manager.query(query).await.unwrap();
-        // assert_eq!(resps.len(), 0);
+    // test filter_reservations_should_work function
+    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    async fn filter_reservations_should_work() {
+        let (rsvp, manager) = make_alice_reservation(migrated_pool.clone()).await;
+        let filter = ReservationFilterBuilder::default()
+            .user_id("aliceid")
+            .status(abi::ReservationStatus::Pending as i32)
+            .build()
+            .unwrap();
+        let (pager, rsvps) = manager.filter(filter).await.unwrap();
+        assert_eq!(pager.prev, -1);
+        assert_eq!(pager.next, -1);
+        assert_eq!(rsvps.len(), 1);
+        assert_eq!(rsvp, rsvps[0]);
     }
 
     async fn make_alice_reservation(pool: PgPool) -> (Reservation, ReservationManager) {

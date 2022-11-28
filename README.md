@@ -17,6 +17,12 @@ sqlx migrate add reservation_trigger -r
  select * from _sqlx_migrations;
 
 
+
+
+
+grant dba to user;
+
+
  pg_dump -s postgres://postgres:123456@localhost:5432/reservation >reservation/fixtures/dump.sql
 ```
 
