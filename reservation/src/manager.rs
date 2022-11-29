@@ -158,7 +158,7 @@ impl Rsvp for ReservationManager {
         // if len-start > page_size, then we have next, we end at len-1
 
         let has_prev = !rsvps.is_empty() && rsvps[0].id == filter.cursor;
-        let start = if has_prev { 1 } else { 0 };
+        let start = usize::from(has_prev);
 
         let has_next = rsvps.len() - start > page_size as usize;
         let end = if has_next {
