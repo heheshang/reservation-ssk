@@ -1,0 +1,12 @@
+---
+# prostgres db config
+db:
+  host: localhost
+  port: 15432
+  username: postgres
+  password: 7cOPpA7dnc
+  dbname: reservation
+# server config
+server:
+  host: 0.0.0.0
+  port: 50001

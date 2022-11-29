@@ -1,7 +1,7 @@
 use crate::{ReservationManager, Rsvp};
-use abi::{FilterPager, ReservationId, Validator};
+use abi::{DbConfig, FilterPager, ReservationId, Validator};
 use async_trait::async_trait;
-use sqlx::{PgPool, Row};
+use sqlx::{postgres::PgPoolOptions, PgPool, Row};
 
 #[async_trait]
 impl Rsvp for ReservationManager {
@@ -183,6 +183,13 @@ impl ReservationManager {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
+    pub async fn from_config(config: &DbConfig) -> Result<Self, abi::Error> {
+        let pool = PgPoolOptions::default()
+            .max_connections(config.max_connections)
+            .connect(&config.url())
+            .await?;
+        Ok(Self::new(pool))
+    }
 }
 
 fn string_to_option(s: &str) -> Option<String> {
@@ -238,7 +245,7 @@ mod tests {
             },
         });
         println!("info {:?}", info);
-        assert_eq!(err, abi::Error::ReservationConflict(info));
+        assert_eq!(err, abi::Error::ConflictReservation(info));
     }
 
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
@@ -326,7 +333,7 @@ mod tests {
         assert_eq!(rsvps.len(), 1);
     }
 
-    // test filter_reservations_should_work function
+    // test filter function
     #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
     async fn filter_reservations_should_work() {
         let (rsvp, manager) = make_alice_reservation(migrated_pool.clone()).await;
