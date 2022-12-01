@@ -32,3 +32,8 @@ grant dba to user;
 
 [正则表达式](https://regexr.com/)
 [pgclient update](https://blog.csdn.net/worldzhy/article/details/106202523)
+
+```shell
+cargo publish --dry-run
+cargo publish
+```

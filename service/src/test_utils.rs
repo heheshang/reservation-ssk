@@ -1,5 +1,5 @@
 use abi::Config;
-use sqlx_db_tester::TestDb;
+use sqlx_db_ssk_tester::TestDb;
 use std::{ops::Deref, path::Path};
 
 pub struct TestConfig {
