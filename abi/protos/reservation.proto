@@ -47,26 +47,27 @@ message ReserveResponse {
 }
 //  To update a reservation, send a UpdateRequest only note field will be updated
 message UpdateRequest {
+    int64 id =1;
     string note =2;
 }
 message UpdateResponse {
     Reservation reservation = 1;
 }
 message ConfirmRequest {
-    string id = 1;
+    int64 id = 1;
 }
 message ConfirmResponse {
     Reservation reservation = 1;
 }
 message CancelRequest {
-    string id = 1;
+    int64 id = 1;
 }
 message CancelResponse {
     Reservation reservation = 1;
 }
 // To get a reservation, send a GetRequest with reservation id
 message GetRequest {
-    string id = 1;
+    int64 id = 1;
 }
 // GetResponse will return a Reservation object
 message GetResponse {

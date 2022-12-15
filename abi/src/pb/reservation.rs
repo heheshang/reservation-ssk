@@ -38,6 +38,8 @@ pub struct ReserveResponse {
 ///   To update a reservation, send a UpdateRequest only note field will be updated
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct UpdateRequest {
+    #[prost(int64, tag = "1")]
+    pub id: i64,
     #[prost(string, tag = "2")]
     pub note: ::prost::alloc::string::String,
 }
@@ -48,8 +50,8 @@ pub struct UpdateResponse {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ConfirmRequest {
-    #[prost(string, tag = "1")]
-    pub id: ::prost::alloc::string::String,
+    #[prost(int64, tag = "1")]
+    pub id: i64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ConfirmResponse {
@@ -58,8 +60,8 @@ pub struct ConfirmResponse {
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CancelRequest {
-    #[prost(string, tag = "1")]
-    pub id: ::prost::alloc::string::String,
+    #[prost(int64, tag = "1")]
+    pub id: i64,
 }
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CancelResponse {
@@ -69,8 +71,8 @@ pub struct CancelResponse {
 /// To get a reservation, send a GetRequest with reservation id
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GetRequest {
-    #[prost(string, tag = "1")]
-    pub id: ::prost::alloc::string::String,
+    #[prost(int64, tag = "1")]
+    pub id: i64,
 }
 /// GetResponse will return a Reservation object
 #[derive(Clone, PartialEq, ::prost::Message)]

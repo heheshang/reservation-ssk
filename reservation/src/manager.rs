@@ -73,18 +73,19 @@ impl Rsvp for ReservationManager {
         .await?;
         Ok(rsvp)
     }
-    async fn delete(&self, id: ReservationId) -> Result<(), abi::Error> {
+    /// 删除并返回old row
+    async fn delete(&self, id: ReservationId) -> Result<abi::Reservation, abi::Error> {
         id.validate()?;
-        sqlx::query(
+        let rsvp: abi::Reservation = sqlx::query_as(
             r#"
             DELETE FROM rsvp.reservations
-            WHERE id = $1
+            WHERE id = $1 RETURNING *
             "#,
         )
         .bind(id)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await?;
-        Ok(())
+        Ok(rsvp)
     }
     async fn get(&self, id: ReservationId) -> Result<abi::Reservation, abi::Error> {
         id.validate()?;

@@ -20,7 +20,7 @@ pub trait Rsvp {
         -> Result<abi::Reservation, Error>;
 
     /// delete a reservation
-    async fn delete(&self, id: ReservationId) -> Result<(), Error>;
+    async fn delete(&self, id: ReservationId) -> Result<abi::Reservation, Error>;
     ///get a reservation by id
     async fn get(&self, id: ReservationId) -> Result<abi::Reservation, Error>;
     /// query reservations
