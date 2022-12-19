@@ -62,7 +62,7 @@ impl BuilderExt for Builder {
     fn with_builder_into(self, paths: &str, fields: &[&str]) -> Self {
         fields.iter().fold(self, |b, f| {
             b.field_attribute(
-                &format!("{}.{}", paths, f),
+                format!("{}.{}", paths, f),
                 "#[builder(setter(into),default)]",
             )
         })
@@ -70,7 +70,7 @@ impl BuilderExt for Builder {
     fn with_builder_option(self, paths: &str, fields: &[&str]) -> Self {
         fields.iter().fold(self, |b, f| {
             b.field_attribute(
-                &format!("{}.{}", paths, f),
+                format!("{}.{}", paths, f),
                 "#[builder(setter(into,strip_option),default)]",
             )
         })
