@@ -103,16 +103,8 @@ pub struct ReservationQuery {
     #[prost(message, optional, tag = "5")]
     #[builder(setter(into, strip_option), default)]
     pub end: ::core::option::Option<::prost_types::Timestamp>,
-    /// current page number for pagination
-    #[prost(int32, tag = "6")]
-    #[builder(setter(into), default)]
-    pub page: i32,
-    /// page size for the reservation query
-    #[prost(int32, tag = "7")]
-    #[builder(setter(into), default)]
-    pub page_size: i32,
     /// sort direction for the reservation query
-    #[prost(bool, tag = "8")]
+    #[prost(bool, tag = "6")]
     #[builder(setter(into), default)]
     pub desc: bool,
 }

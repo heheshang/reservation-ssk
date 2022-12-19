@@ -1,7 +1,10 @@
 use crate::{ReservationManager, Rsvp};
-use abi::{DbConfig, FilterPager, ReservationId, Validator};
+use abi::{convert_to_utc_time, DbConfig, FilterPager, ReservationId, Validator};
 use async_trait::async_trait;
-use sqlx::{postgres::PgPoolOptions, PgPool, Row};
+use futures::StreamExt;
+use sqlx::{postgres::PgPoolOptions, Either, PgPool, Row};
+use tokio::sync::mpsc;
+use tracing::{error, info};
 
 #[async_trait]
 impl Rsvp for ReservationManager {
@@ -104,27 +107,52 @@ impl Rsvp for ReservationManager {
     async fn query(
         &self,
         query: abi::ReservationQuery,
-    ) -> Result<Vec<abi::Reservation>, abi::Error> {
-        query.validate()?;
+    ) -> mpsc::Receiver<Result<abi::Reservation, abi::Error>> {
         let user_id = string_to_option(&query.user_id);
         let resource_id = string_to_option(&query.resource_id);
-        let during = query.get_query_timespan();
+        let start = query.start.map(convert_to_utc_time);
+        let end = query.end.map(convert_to_utc_time);
         let status = abi::ReservationStatus::from_i32(query.status)
-            .unwrap_or(abi::ReservationStatus::Pending)
-            .to_string();
-        let resps = sqlx::query_as(
-            r#"SELECT * FROM rsvp.query($1, $2, $3, $4::rsvp.reservation_status, $5, $6, $7)"#,
-        )
-        .bind(user_id)
-        .bind(resource_id)
-        .bind(during)
-        .bind(status)
-        .bind(query.page)
-        .bind(query.desc)
-        .bind(query.page_size)
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(resps)
+            .unwrap_or(abi::ReservationStatus::Pending);
+        info!(
+            "Query reservation: user_id: {:?}, resource_id: {:?}, start: {:?}, end: {:?}, status: {:?}",
+            user_id, resource_id, start, end, status
+        );
+        let pool = self.pool.clone();
+        let (tx, rx) = mpsc::channel(128);
+
+        tokio::spawn(async move {
+            let mut rsvps = sqlx::query_as(
+                r#"SELECT * FROM rsvp.query($1, $2, $3,$4, $5::rsvp.reservation_status, $6)"#,
+            )
+            .bind(user_id)
+            .bind(resource_id)
+            .bind(start)
+            .bind(end)
+            .bind(status.to_string())
+            .bind(query.desc)
+            .fetch_many(&pool);
+            while let Some(ret) = rsvps.next().await {
+                match ret {
+                    Ok(Either::Left(r)) => {
+                        info!("Query reservation: {:?}", r);
+                    }
+                    Ok(Either::Right(r)) => {
+                        info!("Query reservation: {:?}", r);
+                        if tx.send(Ok(r)).await.is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        error!("Query reservation error: {:?}", e);
+                        if tx.send(Err(e.into())).await.is_err() {
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+        rx
     }
 
     async fn filter(
@@ -301,37 +329,42 @@ mod tests {
         let (rsvp, manager) = make_alice_reservation(migrated_pool.clone()).await;
         let query = ReservationQueryBuilder::default()
             .user_id("aliceid")
+            .start("2021-11-01T15:00:00-0700".parse::<Timestamp>().unwrap())
+            .end("2023-12-31T12:00:00-0700".parse::<Timestamp>().unwrap())
             .status(abi::ReservationStatus::Pending as i32)
-            .start("2022-12-25T15:00:00-0700".parse::<Timestamp>().unwrap())
-            .end("2023-02-25T12:00:00-0700".parse::<Timestamp>().unwrap())
             .build()
             .unwrap();
-        let rsvps = manager.query(query).await.unwrap();
-        assert_eq!(rsvps.len(), 1);
-        assert_eq!(rsvp, rsvps[0]);
 
+        let mut rx = manager.query(query).await;
+        assert_eq!(rx.recv().await, Some(Ok(rsvp.clone())));
+        assert_eq!(rx.recv().await, None);
+
+        // if window is not in range, should return empty
         let query = ReservationQueryBuilder::default()
             .user_id("aliceid")
+            .start("2023-01-01T15:00:00-0700".parse::<Timestamp>().unwrap())
+            .end("2023-02-01T12:00:00-0700".parse::<Timestamp>().unwrap())
             .status(abi::ReservationStatus::Confirmed as i32)
-            .start("2022-12-25T15:00:00-0700".parse::<Timestamp>().unwrap())
-            .end("2023-02-21T12:00:00-0700".parse::<Timestamp>().unwrap())
             .build()
             .unwrap();
+        let mut rx = manager.query(query).await;
+        assert_eq!(rx.recv().await, None);
 
-        let rsvps = manager.query(query).await.unwrap();
-        assert_eq!(rsvps.len(), 0);
-
-        manager.change_status(rsvp.id).await.unwrap();
+        // if status is not in correct, should return empty
         let query = ReservationQueryBuilder::default()
             .user_id("aliceid")
+            .start("2021-11-01T15:00:00-0700".parse::<Timestamp>().unwrap())
+            .end("2023-12-31T12:00:00-0700".parse::<Timestamp>().unwrap())
             .status(abi::ReservationStatus::Confirmed as i32)
-            .start("2022-12-25T15:00:00-0700".parse::<Timestamp>().unwrap())
-            .end("2023-02-25T12:00:00-0700".parse::<Timestamp>().unwrap())
             .build()
             .unwrap();
+        let mut rx = manager.query(query.clone()).await;
+        assert_eq!(rx.recv().await, None);
 
-        let rsvps = manager.query(query).await.unwrap();
-        assert_eq!(rsvps.len(), 1);
+        // change state to confirmed, query should get result
+        let rsvp = manager.change_status(rsvp.id).await.unwrap();
+        let mut rx = manager.query(query).await;
+        assert_eq!(rx.recv().await, Some(Ok(rsvp)));
     }
 
     // test filter function

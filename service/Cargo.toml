@@ -15,7 +15,10 @@ serde = { version = "1.0.148", features = ["derive"] }
 serde_yaml = "0.9.14"
 shellexpand = "2.1.2"
 tokio = { version = "1.22.0", features = ["full"] }
+tokio-stream = "0.1.11"
 tonic = { version = "0.8.3", features = ["tokio-rustls", "gzip"] }
+tracing = "0.1.37"
+tracing-subscriber = "0.3.16"
 
 [dev-dependencies]
 lazy_static = "1.4.0"

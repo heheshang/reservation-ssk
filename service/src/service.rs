@@ -1,12 +1,17 @@
+use std::task::Poll;
+
+use crate::{ReservationStream, RsvpService, TonicReceiverStream};
 use abi::{
     reservation_service_server::ReservationService, CancelRequest, CancelResponse, Config,
     ConfirmRequest, ConfirmResponse, FilterRequest, FilterResponse, GetRequest, GetResponse,
     ListenRequest, QueryRequest, ReserveRequest, ReserveResponse, UpdateRequest, UpdateResponse,
 };
+use futures::Stream;
 use reservation::{ReservationManager, Rsvp};
-use tonic::{Request, Response, Status};
+use tokio::sync::mpsc;
 
-use crate::{ReservationStream, RsvpService};
+use tonic::{Request, Response, Status};
+use tracing::info;
 
 impl RsvpService {
     pub async fn new(config: Config) -> Result<Self, anyhow::Error> {
@@ -89,18 +94,29 @@ impl ReservationService for RsvpService {
         &self,
         request: Request<QueryRequest>,
     ) -> Result<Response<Self::queryStream>, Status> {
-        let request = request.into_inner().query.unwrap();
-        let _reservations = self.manager.query(request).await?;
-        // Ok(Response::new(ReservationStream::new(reservations)))
-        todo!()
+        let request = request.into_inner();
+        if request.query.is_none() {
+            return Err(Status::invalid_argument("query is required"));
+        }
+        info!("query request: {:#?}", request);
+        let query = request.query.unwrap();
+
+        let rsvps = self.manager.query(query).await;
+        info!("query result: {:#?}", rsvps);
+        let stream = TonicReceiverStream::new(rsvps);
+        Ok(Response::new(Box::pin(stream)))
     }
     /// query reservations ,order by reservation id
     async fn filter(
         &self,
         request: Request<FilterRequest>,
     ) -> Result<Response<FilterResponse>, Status> {
-        let request = request.into_inner().filter.unwrap();
-        let (pager, reservations) = self.manager.filter(request).await?;
+        let request = request.into_inner();
+        if request.filter.is_none() {
+            return Err(Status::invalid_argument("filter is required"));
+        }
+        let filter = request.filter.unwrap();
+        let (pager, reservations) = self.manager.filter(filter).await?;
         Ok(Response::new(FilterResponse {
             reservations,
             pager: Some(pager),
@@ -119,11 +135,38 @@ impl ReservationService for RsvpService {
     }
 }
 
+impl<T> TonicReceiverStream<T> {
+    pub fn new(inner: mpsc::Receiver<Result<T, abi::Error>>) -> Self {
+        Self { inner }
+    }
+}
+
+impl<T> Stream for TonicReceiverStream<T> {
+    type Item = Result<T, Status>;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<Self::Item>> {
+        match self.inner.poll_recv(cx) {
+            Poll::Ready(Some(Ok(item))) => Poll::Ready(Some(Ok(item))),
+            Poll::Ready(Some(Err(err))) => {
+                Poll::Ready(Some(Err(Status::internal(err.to_string()))))
+            }
+            Poll::Ready(None) => Poll::Ready(None),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
 // test
 #[cfg(test)]
 mod tests {
 
-    use abi::ReservationFilter;
+    use abi::{convert_to_timestamp, ReservationFilter, ReservationQuery, ReservationStatus};
+    use futures::{future, TryStreamExt};
+    use tonic::Code;
+    use tracing::log::info;
 
     use crate::test_utils::TestConfig;
 
@@ -254,6 +297,54 @@ mod tests {
         };
         let response = service.filter(Request::new(request)).await.unwrap();
         let _reservations = response.into_inner().reservations;
+        // assert!(!reservations.is_empty());
+    }
+    //query reservations by filter
+    #[tokio::test]
+    async fn rpc_query_should_work() {
+        let subscriber = tracing_subscriber::fmt::Subscriber::builder()
+            .with_max_level(tracing::Level::TRACE)
+            .finish();
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+        let config = TestConfig::default();
+        let service = RsvpService::from_config(&config).await.unwrap();
+        let request = ReserveRequest {
+            reservation: Some(abi::Reservation::new_pending(
+                "aliceid",
+                "test-room-317",
+                "2022-12-25T15:00:00-0700".parse().unwrap(),
+                "2022-12-27T12:00:00-0700".parse().unwrap(),
+                "I'll arrive at 3pm. Please help to upgrade to execuitive room if possible.",
+            )),
+        };
+        service.reserve(Request::new(request)).await.unwrap();
+        let request = QueryRequest {
+            query: Some(ReservationQuery {
+                resource_id: "test-room-317".to_string(),
+                start: Some(convert_to_timestamp(
+                    "2022-12-25T15:00:00-0700".parse().unwrap(),
+                )),
+                end: Some(convert_to_timestamp(
+                    "2022-12-27T12:00:00-0700".parse().unwrap(),
+                )),
+                status: ReservationStatus::Pending as i32,
+                ..Default::default()
+            }),
+        };
+        let query = service.query(Request::new(request)).await.unwrap();
+        let stream = query.into_inner();
+        let fut = stream
+            .try_for_each(|res| {
+                info!("rpc_query_should_work reservation: {:?}", res);
+                let id = res.id;
+                if id > 0 {
+                    future::ok(())
+                } else {
+                    future::err(Status::new(Code::Internal, "query reservations failed"))
+                }
+            })
+            .await;
+        assert!(fut.is_ok());
         // assert!(!reservations.is_empty());
     }
 }

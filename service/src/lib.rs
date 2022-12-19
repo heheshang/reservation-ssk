@@ -3,6 +3,7 @@ use std::pin::Pin;
 use abi::Reservation;
 use futures::Stream;
 use reservation::ReservationManager;
+use tokio::sync::mpsc;
 use tonic::Status;
 
 mod service;
@@ -14,3 +15,7 @@ pub struct RsvpService {
 }
 
 type ReservationStream = Pin<Box<dyn Stream<Item = Result<Reservation, Status>> + Send>>;
+
+pub struct TonicReceiverStream<T> {
+    inner: mpsc::Receiver<Result<T, abi::Error>>,
+}
