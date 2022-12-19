@@ -1,16 +1,17 @@
+mod config;
+mod request;
+mod reservation;
+mod reservation_query;
+mod reservation_status;
+
 use std::ops::Bound;
 
+use crate::{convert_to_utc_time, Error};
 use chrono::{DateTime, Utc};
 use prost_types::Timestamp;
 use sqlx::postgres::types::PgRange;
 
-use crate::{convert_to_utc_time, Error};
-
-mod config;
 pub use config::*;
-mod reservation;
-mod reservation_query;
-mod reservation_status;
 
 pub fn validate_range(start: Option<&Timestamp>, end: Option<&Timestamp>) -> Result<(), Error> {
     let f = |op: Option<&Timestamp>| match op {

@@ -1,3 +1,4 @@
+use prost::encoding::bool;
 use serde::{Deserialize, Serialize};
 use std::{fs, path::Path};
 
@@ -28,6 +29,15 @@ pub struct ServerConfig {
     pub host: String,
     pub port: u16,
 }
+impl ServerConfig {
+    pub fn url(&self, https: bool) -> String {
+        if https {
+            format!("https://{}:{}", self.host, self.port)
+        } else {
+            format!("http://{}:{}", self.host, self.port)
+        }
+    }
+}
 
 impl Config {
     pub fn load(filename: impl AsRef<Path>) -> Result<Self, Error> {
@@ -40,15 +50,15 @@ impl Config {
 
 impl DbConfig {
     pub fn url(&self) -> String {
+        format!("{}/{}", self.server_url(), self.dbname)
+    }
+    pub fn server_url(&self) -> String {
         if self.password.is_empty() {
-            format!(
-                "postgres://{}@{}:{}/{}",
-                self.username, self.host, self.port, self.dbname
-            )
+            format!("postgres://{}@{}:{}", self.username, self.host, self.port)
         } else {
             format!(
-                "postgres://{}:{}@{}:{}/{}",
-                self.username, self.password, self.host, self.port, self.dbname
+                "postgres://{}:{}@{}:{}",
+                self.username, self.password, self.host, self.port
             )
         }
     }

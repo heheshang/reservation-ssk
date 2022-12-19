@@ -100,7 +100,7 @@ message ReservationFilter{
     // previous cursor for the reservation query
     int64 cursor = 4;
     // page size for the reservation query
-    int32 page_size = 5;
+    int64 page_size = 5;
     // sort direction for the reservation query
     bool desc = 6;
 
@@ -134,7 +134,7 @@ message ListenRequest {
 // Server will send ListResponse to client  in streaming response
 message ListenResponse {
     // update type
-    ReservationUpdateType op =1;
+    ReservationUpdateType op = 1;
     // id for updated reservation
     Reservation reservation = 2;
 }

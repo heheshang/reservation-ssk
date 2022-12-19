@@ -128,9 +128,9 @@ pub struct ReservationFilter {
     #[builder(setter(into), default)]
     pub cursor: i64,
     /// page size for the reservation query
-    #[prost(int32, tag = "5")]
-    #[builder(setter(into), default)]
-    pub page_size: i32,
+    #[prost(int64, tag = "5")]
+    #[builder(setter(into), default = "10")]
+    pub page_size: i64,
     /// sort direction for the reservation query
     #[prost(bool, tag = "6")]
     #[builder(setter(into), default)]
