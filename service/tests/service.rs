@@ -124,7 +124,7 @@ async fn make_reservation(client: &mut ReservationServiceClient<Channel>, count:
             format!("router-{}", i),
             "2022-12-26T15:00:00-0700".parse().unwrap(),
             "2022-12-30T12:00:00-0700".parse().unwrap(),
-            &format!("test device reservation {}", i),
+            format!("test device reservation {}", i),
         );
         let ret = client
             .reserve(ReserveRequest::new(rsvp.clone()))
