@@ -21,6 +21,10 @@ pub struct TonicReceiverStream<T> {
 }
 
 pub async fn start_server(config: &Config) -> Result<(), anyhow::Error> {
+    let subscriber = tracing_subscriber::fmt::Subscriber::builder()
+        .with_max_level(tracing::Level::INFO)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).unwrap();
     let addr = format!("{}:{}", config.server.host, config.server.port);
     let svc = RsvpService::from_config(config).await?;
     let svc = ReservationServiceServer::new(svc);

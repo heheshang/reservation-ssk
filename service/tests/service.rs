@@ -10,6 +10,7 @@ use reservation_service::start_server;
 use test_utils::TestConfig;
 use tokio::time;
 use tonic::transport::Channel;
+use tracing::info;
 
 #[tokio::test]
 async fn grpc_server_should_work() {
@@ -70,7 +71,7 @@ async fn grpc_query_should_work() {
         .unwrap()
         .into_inner();
     while let Some(r) = ret.message().await.unwrap() {
-        println!("{:?}", r);
+        info!("{:?}", r);
     }
 }
 #[tokio::test]
