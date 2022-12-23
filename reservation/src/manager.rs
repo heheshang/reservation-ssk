@@ -18,7 +18,7 @@ impl Rsvp for ReservationManager {
 
         let status = abi::ReservationStatus::from_i32(rsvp.status)
             .unwrap_or(abi::ReservationStatus::Pending);
-
+        info!("timespan: {:?}", timespan);
         // generate a insert sql for the reservation
         let id = sqlx::query(
             r#"
@@ -237,20 +237,25 @@ mod tests {
         ReservationQueryBuilder, ReservationWindow,
     };
     use prost_types::Timestamp;
+    use sqlx_db_tester::TestDb;
 
     use super::*;
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn reserve_should_work_for_valid_window() {
-        let (rsvp, _) = make_ssk_reservation(migrated_pool).await;
+        let tdb = get_db();
+        let pool = tdb.get_pool().await;
+        let (rsvp, _) = make_ssk_reservation(pool).await;
         println!("{:?}", rsvp);
         assert_eq!(rsvp.resource_id, "ocean-view-room-713");
         assert_eq!(rsvp.user_id, "sskid");
         assert_eq!(rsvp.id, 1);
     }
 
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn reserve_conflict_reservation_should_reject() {
-        let (rsvp, manager) = make_ssk_reservation(migrated_pool).await;
+        let tdb = get_db();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_ssk_reservation(pool).await;
         let rsvp2 = abi::Reservation::new_pending(
             "aliceid",
             "ocean-view-room-713",
@@ -277,18 +282,22 @@ mod tests {
         assert_eq!(err, abi::Error::ConflictReservation(info));
     }
 
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn change_status_should_work() {
-        let (rsvp, manager) = make_alice_reservation(migrated_pool).await;
+        let tdb = get_db();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_alice_reservation(pool).await;
         println!("rsvp: {:?}", rsvp);
         let id = rsvp.id;
         let rsvp = manager.change_status(id).await.unwrap();
         assert_eq!(rsvp.status, abi::ReservationStatus::Confirmed as i32);
     }
 
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn reserve_change_status_not_pending_shhou_do_nothing() {
-        let (rsvp, manager) = make_alice_reservation(migrated_pool).await;
+        let tdb = get_db();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_alice_reservation(pool).await;
         println!("rsvp: {:?}", rsvp);
         let rsvp = manager.change_status(rsvp.id).await.unwrap();
         // change status again should do nothing
@@ -296,9 +305,11 @@ mod tests {
         assert_eq!(rsvp.status, abi::ReservationStatus::Confirmed as i32);
     }
 
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn update_note_should_work() {
-        let (rsvp, manager) = make_alice_reservation(migrated_pool.clone()).await;
+        let tdb = get_db();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_alice_reservation(pool.clone()).await;
         println!("r: {:?}", rsvp);
         let r = manager
             .update_note(rsvp.id, "new note".to_string())
@@ -306,27 +317,31 @@ mod tests {
             .unwrap();
         assert_eq!(r.note, "new note");
     }
-
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn delete_reservation_should_work() {
-        let (rsvp, manager) = make_alice_reservation(migrated_pool.clone()).await;
+        let tdb = get_db();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_alice_reservation(pool.clone()).await;
         println!("r: {:?}", rsvp);
         let r = manager.delete(rsvp.id).await;
         assert!(r.is_ok());
     }
-
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn get_reservation_by_id_should_work() {
-        let (rsvp, manager) = make_alice_reservation(migrated_pool.clone()).await;
+        let tdb = get_db();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_alice_reservation(pool.clone()).await;
         println!("r: {:?}", rsvp);
         let r = manager.get(rsvp.id).await.unwrap();
         assert_eq!(r.id, rsvp.id);
     }
 
     // // query function test
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn query_reservations_should_work() {
-        let (rsvp, manager) = make_alice_reservation(migrated_pool.clone()).await;
+        let tdb = get_db();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_alice_reservation(pool.clone()).await;
         let query = ReservationQueryBuilder::default()
             .user_id("aliceid")
             .start("2021-11-01T15:00:00-0700".parse::<Timestamp>().unwrap())
@@ -368,9 +383,11 @@ mod tests {
     }
 
     // test filter function
-    #[sqlx_database_tester::test(pool(variable = "migrated_pool", migrations = "../migrations"))]
+    #[tokio::test]
     async fn filter_reservations_should_work() {
-        let (rsvp, manager) = make_alice_reservation(migrated_pool.clone()).await;
+        let tdb = get_db();
+        let pool = tdb.get_pool().await;
+        let (rsvp, manager) = make_alice_reservation(pool.clone()).await;
         let filter = ReservationFilterBuilder::default()
             .user_id("aliceid")
             .status(abi::ReservationStatus::Pending as i32)
@@ -381,6 +398,16 @@ mod tests {
         assert_eq!(pager.next, -1);
         assert_eq!(rsvps.len(), 1);
         assert_eq!(rsvp, rsvps[0]);
+    }
+
+    fn get_db() -> TestDb {
+        TestDb::new(
+            "localhost",
+            15432,
+            "postgres",
+            "7cOPpA7dnc",
+            "../migrations",
+        )
     }
 
     async fn make_alice_reservation(pool: PgPool) -> (Reservation, ReservationManager) {

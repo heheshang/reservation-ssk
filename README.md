@@ -37,3 +37,8 @@ grant dba to user;
 cargo publish --dry-run
 cargo publish
 ```
+
+```sql
+INSERT INTO rsvp.reservations (id, user_id, status, resource_id, timespan, note) VALUES(1, 'sss', 'confirmed'::rsvp."reservation_status", '22222222', '["2017-05-06 01:00:00+08","2017-05-06 03:00:00+08")'::tstzrange, 'ssssss');
+
+```

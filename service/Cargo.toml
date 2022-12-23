@@ -29,4 +29,4 @@ sqlx = { version = "0.6.2", features = [
     "chrono",
     "uuid",
 ] }
-sqlx-db-ssk-tester = "0.1.1"
+sqlx-db-tester = "0.1.1"
