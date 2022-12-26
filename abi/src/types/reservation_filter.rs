@@ -96,7 +96,7 @@ impl ReservationFilter {
 
 impl ToSql for ReservationFilter {
     fn to_sql(&self) -> String {
-        let middle_plus = if self.cursor.is_none() { 0 } else { 1 };
+        let middle_plus = i64::from(self.cursor.is_some());
         let limit = self.page_size + 1 + middle_plus;
 
         let status = self.get_status();
