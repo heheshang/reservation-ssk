@@ -1,6 +1,7 @@
 mod config;
 mod request;
 mod reservation;
+mod reservation_filter;
 mod reservation_query;
 mod reservation_status;
 
@@ -14,13 +15,13 @@ use sqlx::postgres::types::PgRange;
 pub use config::*;
 
 pub fn validate_range(start: Option<&Timestamp>, end: Option<&Timestamp>) -> Result<(), Error> {
-    let f = |op: Option<&Timestamp>| match op {
-        Some(ts) => Ok(ts.seconds),
-        None => Err(Error::InvalidTime),
-    };
-    let start = f(start).unwrap();
-    let end = f(end).unwrap();
-    if start >= end {
+    if start.is_none() || end.is_none() {
+        return Err(Error::InvalidTime);
+    }
+
+    let start = start.as_ref().unwrap();
+    let end = end.as_ref().unwrap();
+    if start.seconds >= end.seconds {
         return Err(Error::InvalidTime);
     }
     Ok(())
@@ -28,7 +29,7 @@ pub fn validate_range(start: Option<&Timestamp>, end: Option<&Timestamp>) -> Res
 
 pub fn get_timespan(start: Option<&Timestamp>, end: Option<&Timestamp>) -> PgRange<DateTime<Utc>> {
     let f = |op: Option<&Timestamp>| match op {
-        Some(ts) => Ok(convert_to_utc_time(ts.clone())),
+        Some(ts) => Ok(convert_to_utc_time(ts)),
         None => Err(Error::InvalidTime),
     };
     let start = f(start).unwrap();
@@ -76,22 +77,16 @@ mod tests {
     }
     #[test]
     fn get_timespan_should_work() {
-        let start = Some(&Timestamp {
+        let start = &Timestamp {
             seconds: 1,
             nanos: 0,
-        });
-        let end = Some(&Timestamp {
+        };
+        let end = &Timestamp {
             seconds: 2,
             nanos: 0,
-        });
-        let timespan = get_timespan(start, end);
-        assert_eq!(
-            timespan.start,
-            Bound::Included(convert_to_utc_time(start.unwrap().clone()))
-        );
-        assert_eq!(
-            timespan.end,
-            Bound::Excluded(convert_to_utc_time(end.unwrap().clone()))
-        );
+        };
+        let timespan = get_timespan(Some(start), Some(end));
+        assert_eq!(timespan.start, Bound::Included(convert_to_utc_time(start)));
+        assert_eq!(timespan.end, Bound::Excluded(convert_to_utc_time(end)));
     }
 }

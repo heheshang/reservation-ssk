@@ -95,8 +95,8 @@ async fn grpc_filter_should_work() {
         .into_inner();
 
     let pager = pager.unwrap();
-    assert_eq!(pager.next, filter.page_size);
-    assert_eq!(pager.prev, -1);
+    assert_eq!(pager.next, Some(filter.page_size));
+    assert_eq!(pager.prev, None);
 
     assert_eq!(reservations.len(), filter.page_size as usize);
     let mut next_filter = filter.clone();

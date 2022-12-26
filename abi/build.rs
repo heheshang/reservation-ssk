@@ -15,9 +15,17 @@ fn main() {
         )
         .with_derive_builder_into(
             "reservation.ReservationFilter",
-            &["resource_id", "user_id", "status", "cursor", "desc"],
+            &["resource_id", "user_id", "status", "desc"],
         )
+        .with_derive_builder_option("reservation.ReservationFilter", &["cursor"])
         .with_derive_builder_option("reservation.ReservationQuery", &["start", "end"])
+        .with_type_attributes(
+            &[
+                "reservation.ReservationFilter",
+                "reservation.ReservationQuery",
+            ],
+            &[r#"#[builder(build_fn(name = "private_build"))]"#],
+        )
         .with_field_attributes(
             &["page_size"],
             &["#[builder(setter(into), default = \"10\")]"],

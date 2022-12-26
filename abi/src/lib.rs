@@ -1,4 +1,5 @@
 mod error;
+mod pager;
 mod pb;
 mod types;
 mod utils;
@@ -14,6 +15,15 @@ pub type InvalidResourceId = String;
 
 pub trait Validator {
     fn validate(&self) -> Result<(), Error>;
+}
+
+pub trait Normalizer: Validator {
+    fn normalize(&mut self) -> Result<(), Error> {
+        self.validate()?;
+        self.do_normalize();
+        Ok(())
+    }
+    fn do_normalize(&mut self);
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, sqlx::Type)]
@@ -42,4 +52,8 @@ impl Validator for ReservationId {
         }
         Ok(())
     }
+}
+
+pub trait ToSql {
+    fn to_sql(&self) -> String;
 }

@@ -113,7 +113,7 @@ impl ReservationService for RsvpService {
     ) -> Result<Response<FilterResponse>, Status> {
         let request = request.into_inner();
         if request.filter.is_none() {
-            return Err(Status::invalid_argument("filter is required"));
+            return Err(Status::invalid_argument("missing filter parameter"));
         }
         let filter = request.filter.unwrap();
         let (pager, reservations) = self.manager.filter(filter).await?;
@@ -289,15 +289,14 @@ mod tests {
         let request = FilterRequest {
             filter: Some(ReservationFilter {
                 resource_id: "test-room-317".to_string(),
-                cursor: 0,
                 page_size: 10,
                 desc: false,
                 ..Default::default()
             }),
         };
         let response = service.filter(Request::new(request)).await.unwrap();
-        let _reservations = response.into_inner().reservations;
-        // assert!(!reservations.is_empty());
+        let reservations = response.into_inner().reservations;
+        assert!(!reservations.is_empty());
     }
     //query reservations by filter
     #[tokio::test]

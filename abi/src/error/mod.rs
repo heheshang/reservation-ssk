@@ -34,6 +34,12 @@ pub enum Error {
     InvalidTime,
     #[error("No reservation found by the given condition")]
     NotFound,
+    #[error("Invalid cursor: {0}")]
+    InvalidCursor(i64),
+    #[error("Invalid page size: {0}")]
+    InvalidPageSize(i64),
+    #[error("Invalid status: {0}")]
+    InvalidStatus(i32),
 }
 impl PartialEq for Error {
     fn eq(&self, other: &Self) -> bool {
@@ -100,6 +106,9 @@ impl From<crate::Error> for tonic::Status {
                 tonic::Status::invalid_argument(format!("Invalid resource id: {}", id))
             }
             crate::Error::Unknown => tonic::Status::unknown("unknown error"),
+            Error::InvalidPageSize(_) | Error::InvalidStatus(_) | Error::InvalidCursor(_) => {
+                tonic::Status::invalid_argument(e.to_string())
+            }
         }
     }
 }
